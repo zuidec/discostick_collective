@@ -1,1 +1,0 @@
-/home/zuidec/programming/stmcube/discostick_common/Core/Inc/com_packet.h

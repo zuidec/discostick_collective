@@ -1,1 +1,0 @@
-/home/zuidec/programming/stmcube/discostick_common/Core/Inc/w25q16jv.h

@@ -21,7 +21,7 @@
 #include "adc.h"
 
 /* USER CODE BEGIN 0 */
-
+#include "logger.h"
 /* USER CODE END 0 */
 
 ADC_HandleTypeDef hadc1;

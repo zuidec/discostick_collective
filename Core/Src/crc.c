@@ -22,6 +22,7 @@
 
 /* USER CODE BEGIN 0 */
 
+#include "logger.h"
 /* USER CODE END 0 */
 
 CRC_HandleTypeDef hcrc;

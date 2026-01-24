@@ -46,13 +46,14 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-
+#ifdef USE_HAL_ERRORHANDLER
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+#endif
 
 /* USER CODE END EFP */
 
@@ -61,14 +62,15 @@ void Error_Handler(void);
 #define SW_OK_GPIO_Port GPIOE
 #define SW_CAL_Pin GPIO_PIN_3
 #define SW_CAL_GPIO_Port GPIOE
-#define LED1_Pin GPIO_PIN_4
-#define LED1_GPIO_Port GPIOE
-#define LED2_Pin GPIO_PIN_5
-#define LED2_GPIO_Port GPIOE
-#define LED3_Pin GPIO_PIN_6
-#define LED3_GPIO_Port GPIOE
-#define LED4_Pin GPIO_PIN_13
-#define LED4_GPIO_Port GPIOC
+#define SW_CAL_EXTI_IRQn EXTI3_IRQn
+#define LED_1_Pin GPIO_PIN_4
+#define LED_1_GPIO_Port GPIOE
+#define LED_2_Pin GPIO_PIN_5
+#define LED_2_GPIO_Port GPIOE
+#define LED_3_Pin GPIO_PIN_6
+#define LED_3_GPIO_Port GPIOE
+#define LED_4_Pin GPIO_PIN_13
+#define LED_4_GPIO_Port GPIOC
 #define UART4_EN_Pin GPIO_PIN_3
 #define UART4_EN_GPIO_Port GPIOC
 #define UART2_EN_Pin GPIO_PIN_4
@@ -119,6 +121,7 @@ void Error_Handler(void);
 #define COLL_TQ_LIM_GPIO_Port GPIOC
 #define COLL_CDR_Pin GPIO_PIN_7
 #define COLL_CDR_GPIO_Port GPIOC
+#define COLL_CDR_EXTI_IRQn EXTI9_5_IRQn
 #define COLL_GRIP_2_Pin GPIO_PIN_8
 #define COLL_GRIP_2_GPIO_Port GPIOC
 #define COLL_GRIP_1_Pin GPIO_PIN_9
@@ -135,7 +138,27 @@ void Error_Handler(void);
 #define COLL_STEP_EN_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+#define NUM_ADC_CHANNEL             (1)
+#define NUM_AXIS                    (1)
+#define UINT16_T_MAX				(65536)
+#define THRUST_ALPHA 				(0.3f)
+#define THRUST_BUTTON_MASK			((uint32_t)0x001FEFFFF)
+#define AXIS_RANGE					(2048)
+#define SAMPLE_TIME_MS              (3)
 
+//                                    00000000 00000000 00000000 00000000
+#define GPIOB_BITMASK               (0x0000FC00)    //0b11111100 00000000
+#define GPIOC_BITMASK               (0x000003C0)    //0b00000011 11000000
+#define GPIOD_BITMASK               (0x0000FF00)    //0b11111111 00000000
+#define GPIOE_BITMASK               (0x0000FE00)    //0b11111110 00000000
+#define GPIOB_OFFSET                (9)
+#define GPIOC_OFFSET                (9)
+#define GPIOD_OFFSET                (8)
+#define GPIOE_OFFSET                (1)
+#define MAG_REL_PRESSED(x)          (x & 0x00010000)
+
+#define RX_BUFFER_SIZE      (1024)
+#define UART_BUFFER_SIZE RX_BUFFER_SIZE
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

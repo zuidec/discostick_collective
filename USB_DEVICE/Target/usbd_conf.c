@@ -27,7 +27,7 @@
 #include "usbd_cdc.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "logger.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,7 +36,7 @@
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-
+#ifdef USE_HAL_ERRORHANDLER
 /* USER CODE END PV */
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
@@ -46,7 +46,11 @@ void Error_Handler(void);
 void SystemClock_Config(void);
 
 /* USER CODE BEGIN 0 */
+#endif
+PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
+/* External functions --------------------------------------------------------*/
+void SystemClock_Config(void);
 /* USER CODE END 0 */
 
 /* USER CODE BEGIN PFP */

@@ -10,4 +10,5 @@
 *.elf
 *.map
 *.list
-
+compile_commands.json
+Debug

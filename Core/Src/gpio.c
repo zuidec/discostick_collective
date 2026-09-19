@@ -79,7 +79,7 @@ void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : SW_CAL_Pin */
   GPIO_InitStruct.Pin = SW_CAL_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(SW_CAL_GPIO_Port, &GPIO_InitStruct);
 
@@ -108,7 +108,7 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin : UART4_EN_Pin */
   GPIO_InitStruct.Pin = UART4_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(UART4_EN_GPIO_Port, &GPIO_InitStruct);
 
@@ -142,7 +142,7 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pin = COLL_LDL_RET_Pin|COLL_LDL_EXT_Pin|COLL_LDL_RIGHT_Pin|COLL_LDL_LEFT_Pin
                           |COLL_TRIM_DOWN_Pin|COLL_TRIM_UP_Pin|COLL_TRIM_RIGHT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
   /*Configure GPIO pins : COLL_TRIM_LEFT_Pin COLL_HOIST_DN_Pin COLL_HOIST_UP_Pin COLL_RPM_100_Pin
@@ -150,7 +150,7 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pin = COLL_TRIM_LEFT_Pin|COLL_HOIST_DN_Pin|COLL_HOIST_UP_Pin|COLL_RPM_100_Pin
                           |COLL_ENG2_DEC_Pin|COLL_ENG2_INC_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : COLL_ENG1_DEC_Pin COLL_ENG1_INC_Pin COLL_LDL_OVRD_Pin COLL_ENG2_MAN_Pin
@@ -158,13 +158,13 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pin = COLL_ENG1_DEC_Pin|COLL_ENG1_INC_Pin|COLL_LDL_OVRD_Pin|COLL_ENG2_MAN_Pin
                           |COLL_ENG1_MAN_Pin|COLL_HOIST_CUT_Pin|COLL_FLOAT_Pin|COLL_CATA_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /*Configure GPIO pins : COLL_TQ_LIM_Pin COLL_GRIP_2_Pin COLL_GRIP_1_Pin */
   GPIO_InitStruct.Pin = COLL_TQ_LIM_Pin|COLL_GRIP_2_Pin|COLL_GRIP_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : COLL_CDR_Pin */
@@ -192,14 +192,14 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin : FLASH_CS_Pin */
   GPIO_InitStruct.Pin = FLASH_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(FLASH_CS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : COLL_STEP_DIR_Pin COLL_STEP_EN_Pin */
   GPIO_InitStruct.Pin = COLL_STEP_DIR_Pin|COLL_STEP_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 

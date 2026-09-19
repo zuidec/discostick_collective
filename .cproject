@@ -89,8 +89,8 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
 						<entry excluding="discostick_common/3rd_party/nanoprintf/tests|discostick_common/3rd_party/nanoprintf/examples|discostick_common/3rd_party/littlefs/tests|discostick_common/3rd_party/littlefs/scripts|discostick_common/3rd_party/littlefs/runners|discostick_common/3rd_party/littlefs/benches|discostick_common/3rd_party/littlefs/bd|littlefs/runners|littlefs/scripts|littlefs/tests|littlefs/benches|littlefs/bd" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Middlewares"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="USB_DEVICE"/>
 					</sourceEntries>
@@ -181,8 +181,8 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
 						<entry excluding="discostick_common/3rd_party/nanoprintf/tests|discostick_common/3rd_party/nanoprintf/examples|discostick_common/3rd_party/littlefs/tests|discostick_common/3rd_party/littlefs/scripts|discostick_common/3rd_party/littlefs/runners|discostick_common/3rd_party/littlefs/benches|discostick_common/3rd_party/littlefs/bd|littlefs/runners|littlefs/scripts|littlefs/tests|littlefs/benches|littlefs/bd" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Middlewares"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="USB_DEVICE"/>
 					</sourceEntries>

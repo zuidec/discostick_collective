@@ -39,21 +39,29 @@
 #include "stepper.h"
 #include "axis_control.h"
 #include "input_filter.h"
-#include "w25q16jv.h"
 #include "lfs_conf.h"
 #include "dev_id_strings.h"
 #include "uart.h"
+#include "bus.h"
+#include "spi_bus.h"
 
 #define LOG_PREFIX  "[thrust]"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+/*
+typedef struct uart_port_t  {
+    uart_handle_t* uart;
+    com_packet_t* cpacket;
+    com_packet_t* lpacket;
+} uart_port_t;
+*/
 union collective_data_t	{
 	collective_report_t report;
 	uint16_t raw[3];
 } collective_data;
+const uint8_t dev_com_addr = COM_ADDR_COLL;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -77,10 +85,13 @@ volatile uint32_t cdr_debounce_timer = 0;
 axis_calibration_factors_t thrust_calibrations = {0};
 input_filter_t thrust_filter;
 stepper_handle_t thrust_motor;
-w25q16_handle_t f_handle = {&hspi1, FLASH_CS_GPIO_Port, FLASH_CS_Pin};
-com_packet_t *cur_packet, *prev_packet, *report_packet, *special_packet = (com_packet_t*)NULL;
-static uart_handle_t uart_4,uart_3;
-uart_handle_t *uart_cyclic, *uart_log = (uart_handle_t*)NULL;
+bus_t f_handle;
+spi_bus_ctx_t spi_ctx = { &hspi1, (void*)FLASH_CS_GPIO_Port, (uint16_t)FLASH_CS_Pin, 500 };
+com_packet_t packet1, packet2, packet3, packet4, packet5, packet6;
+com_packet_t *cyclic_cur_packet, *cyclic_prev_packet, *console_cur_packet, *console_prev_packet, *report_packet, *special_packet = (com_packet_t*)NULL;
+static uart_handle_t uart_4,uart_3,uart_2;
+uart_handle_t *uart_cyclic, *uart_log, *uart_console = (uart_handle_t*)NULL;
+uart_port_t cyclic_port, console_port;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -102,11 +113,12 @@ void init_collective_input(void);
 
 void update_collective_input(void);
 void update_uart_cyclic(void);
+void update_uart_port(uart_port_t*);
 void update_stepper(void);
 
 void send_report(com_addr_t);
-void send_ack(com_addr_t);
-void send_nack(com_addr_t);
+void send_ack(com_addr_t,uart_handle_t*);
+void send_nack(com_addr_t,uart_handle_t*);
 
 void calibration_routine(void);
 void calibrate_axis(axis_calibration_factors_t* cal, volatile uint16_t* adc_buf);
@@ -156,14 +168,25 @@ int main(void)
   MX_TIM8_Init();
   MX_UART5_Init();
   MX_USART2_UART_Init();
-  //MX_USB_DEVICE_Init();
+  MX_USB_DEVICE_Init();
   MX_TIM1_Init();
   MX_TIM11_Init();
   /* USER CODE BEGIN 2 */
+    print_boot_msg();
     uart_cyclic = &uart_4;
     uart_log = &uart_3;
+    uart_console = &uart_2;
 
     init_gpio_state();  
+    if(UART_OK != uart_init(uart_console, &huart2)){
+        uart_deinit(uart_console);
+      if(UART_OK != uart_init(uart_console, &huart2))    {
+        uart_deinit(uart_console);
+          uart_log = NULL;
+          log_error("%sFailed to initialize console UART",LOG_PREFIX);
+        panic();
+      }
+    }
     if(UART_OK != uart_init(uart_log, &huart3)){
         uart_deinit(uart_log);
       if(UART_OK != uart_init(uart_log, &huart3))    {
@@ -173,8 +196,8 @@ int main(void)
         panic();
       }
     }
-    print_boot_msg();
     if(UART_OK != uart_init(uart_cyclic, &huart4)){
+        uart_deinit(uart_cyclic);
       if(UART_OK != uart_init(uart_cyclic, &huart4))    {
           log_error("%sFailed to initialize cyclic UART",LOG_PREFIX);
         panic();
@@ -189,12 +212,20 @@ int main(void)
     init_filesystem();
     init_collective_input();
 
-    com_packet_t packet1, packet2, packet3, packet4;
-    cur_packet      = &packet1;
-    prev_packet     = &packet2;
-    report_packet   = &packet3;
-    special_packet  = &packet4;
+    cyclic_cur_packet      = &packet1;
+    cyclic_prev_packet     = &packet2;
+    console_cur_packet     = &packet3;
+    console_prev_packet    = &packet4;
+    report_packet          = &packet5;
+    special_packet         = &packet6;
     init_com_packets();
+
+    console_port.uart = uart_console;
+    console_port.cpacket = console_cur_packet;
+    console_port.lpacket = console_prev_packet;
+    cyclic_port.uart = uart_cyclic;
+    cyclic_port.cpacket = cyclic_cur_packet;
+    cyclic_port.lpacket = cyclic_prev_packet;
 
     log_info("%sAll initialization complete, jumping to main program loop",LOG_PREFIX);
     HAL_TIM_Base_Start_IT(&htim11);
@@ -209,12 +240,14 @@ int main(void)
         calibration_routine();
     }
 
-    update_uart_cyclic();
+    update_uart_port(&cyclic_port);
+    update_uart_port(&console_port);
     update_stepper();
 
     if(IRQ_UART_Flag)  {
        update_collective_input();
        send_report(COM_ADDR_CYCLIC);
+       send_report(COM_ADDR_CTRL);
        IRQ_UART_Flag = false;
        HAL_TIM_Base_Start_IT(&htim11);
     }
@@ -346,8 +379,10 @@ void init_com_packets(void) {
         log_error("%sFailed to initialize com packet interface",LOG_PREFIX);
     }
     else    {
-        com_packet_clear(cur_packet);
-        com_packet_clear(prev_packet);
+        com_packet_clear(cyclic_cur_packet);
+        com_packet_clear(cyclic_prev_packet);
+        com_packet_clear(console_cur_packet);
+        com_packet_clear(console_prev_packet);
         com_packet_clear(report_packet);
         com_packet_clear(special_packet);
     }
@@ -355,6 +390,7 @@ void init_com_packets(void) {
 
 void init_filesystem(void)  {
     HAL_Delay(10); // Give flash module some time to come up
+    spi_bus_init(&f_handle, &spi_ctx);
     if(init_flashfs(&f_handle)<0)	{
         log_error("%sFailed to initialize filesystem. It may need to be reformatted.\nReformat now? [y/n]:", LOG_PREFIX);
         uint8_t response[1] = {0};
@@ -453,35 +489,121 @@ void update_collective_input(void)  {
                                     | ((uint32_t)(GPIOD->IDR & GPIOD_BITMASK) >> GPIOD_OFFSET)
                                     | ((uint32_t)(GPIOE->IDR & GPIOE_BITMASK) >> GPIOE_OFFSET);
     collective_data.report.buttons = (collective_data.report.buttons ^ THRUST_BUTTON_MASK);
-    /*
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_LDL_RET_GPIO_Port, COLL_LDL_RET_Pin) << 0;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_LDL_EXT_GPIO_Port, COLL_LDL_EXT_Pin) << 1;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_LDL_RIGHT_GPIO_Port, COLL_LDL_RIGHT_Pin) << 2;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_LDL_LEFT_GPIO_Port, COLL_LDL_LEFT_Pin) << 3;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_TRIM_DOWN_GPIO_Port, COLL_TRIM_DOWN_Pin) << 4;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_TRIM_UP_GPIO_Port, COLL_TRIM_UP_Pin) << 5;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_TRIM_RIGHT_GPIO_Port, COLL_TRIM_RIGHT_Pin) << 6;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_TRIM_LEFT_GPIO_Port, COLL_TRIM_LEFT_Pin) << 7;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_HOIST_DN_GPIO_Port, COLL_HOIST_DN_Pin) << 8;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_HOIST_UP_GPIO_Port, COLL_HOIST_UP_Pin) << 9;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_RPM_100_GPIO_Port, COLL_RPM_100_Pin) << 10;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_ENG2_DEC_GPIO_Port, COLL_ENG2_DEC_Pin) << 11;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_ENG2_INC_GPIO_Port, COLL_ENG2_INC_Pin) << 12;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_ENG1_DEC_GPIO_Port, COLL_ENG1_DEC_Pin) << 13;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_ENG1_INC_GPIO_Port, COLL_ENG1_INC_Pin) << 14;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_LDL_OVRD_GPIO_Port, COLL_LDL_OVRD_Pin) << 15;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_ENG2_MAN_GPIO_Port, COLL_ENG2_MAN_Pin) << 16;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_ENG1_MAN_GPIO_Port, COLL_ENG1_MAN_Pin) << 17;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_HOIST_CUT_GPIO_Port, COLL_HOIST_CUT_Pin) << 18;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_FLOAT_GPIO_Port, COLL_FLOAT_Pin) << 19;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_CATA_GPIO_Port, COLL_CATA_Pin) << 20;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_TQ_LIM_GPIO_Port, COLL_TQ_LIM_Pin) << 21;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_CDR_GPIO_Port, COLL_CDR_Pin) << 22;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_GRIP_1_GPIO_Port, COLL_GRIP_1_Pin) << 23;
-    collective_data.report.buttons |= (uint32_t)HAL_GPIO_ReadPin(COLL_GRIP_2_GPIO_Port, COLL_GRIP_2_Pin) << 24;
-    */
 }
 
+void update_uart_port(uart_port_t* port) {
+    /*
+     *  This is an ugly nested logic function. I thought about trying to split 
+     *  it up and make it easier to read, but I opted instead to just put it all
+     *  in this one function to avoid making further abstractions.
+     */
+    if (uart_update(port->uart) == UART_RX_FAIL) {
+        return;
+    }
+    if(port->uart->unread_bytes > 0)	{
+        uint8_t temp[RX_BUFFER_SIZE] = {0};
+        uint32_t bytes_read =  fifo_peek_continuous(&port->uart->rx_fifo, temp, port->uart->unread_bytes, sizeof(temp));
+        com_packet_result_t result = com_packet_parse(port->cpacket,temp,bytes_read);
+        if(result.type == COM_PACKET_FALSE)	{
+        	return;
+        }
+        com_addr_t recv_addr = port->cpacket->src_addr;
+
+        if(port->cpacket->dest_addr == dev_com_addr)    {
+            switch(result.type)  {
+              case COM_PACKET_NORMAL:
+                fifo_push_read_index(&port->uart->rx_fifo, result.bytes_consumed);
+                send_ack(recv_addr,port->uart);
+                break;
+              case COM_PACKET_CMD:
+                  fifo_push_read_index(&port->uart->rx_fifo, result.bytes_consumed);
+                  switch(com_packet_get_cmd(port->cpacket)) {
+                      case CMD_CDR_EN:
+                          send_ack(recv_addr,port->uart);
+                          break;
+                      case CMD_CDR_DS:
+                          send_ack(recv_addr,port->uart);
+                          break;
+                      case CMD_GET_POS:
+                          if(port->cpacket->payload[1] == axis_thrust)    {
+                              uint8_t pos[sizeof(int16_t)+1] = {0};
+                              pos[0] = axis_thrust;
+                              memcpy(&pos[1], &collective_data.report.thrust, sizeof(collective_data.report.thrust));
+                              com_packet_create_special(special_packet, recv_addr, COM_PACKET_POS, pos, sizeof(pos));
+                              uart_write_packet(port->uart, special_packet);
+                          }
+                          break;
+                      case CMD_GET_CAL: {
+                          if(port->cpacket->payload[1] == axis_thrust)  {
+                              uint8_t tmp[sizeof(axis_calibration_factors_t)+1] = {0};
+                              tmp[0] = axis_thrust;
+                              memcpy(&tmp[1],&thrust_calibrations,sizeof(axis_calibration_factors_t));
+                              com_packet_create_special(special_packet, recv_addr, COM_PACKET_CAL_FACTOR, tmp, sizeof(tmp));
+                              uart_write_packet(port->uart, special_packet);
+                          }
+                          break;
+                      }
+                      case CMD_SET_CAL: {
+                          if(port->cpacket->payload_length - port->cpacket->padding - 2 >= sizeof(axis_calibration_factors_t))    {
+                              axis_calibration_factors_t new_cal;
+                              memcpy(&new_cal, &port->cpacket->payload[2], sizeof(axis_calibration_factors_t));
+                              if(true == verify_calibration(&new_cal) && port->cpacket->payload[1] == axis_thrust)  {
+                                  memcpy(&thrust_calibrations, &new_cal, sizeof(axis_calibration_factors_t));
+                                  save_calibration(axis_thrust,(uint8_t*)&thrust_calibrations, sizeof(axis_calibration_factors_t));
+                                  send_ack(recv_addr,port->uart);
+                              }
+                          }
+                          else  {
+                              send_nack(recv_addr,port->uart);
+                          }
+                          break;
+                      }
+                      case CMD_STEP_ON:
+                          stepper_master_enable(&thrust_motor);
+                          send_ack(recv_addr,port->uart);
+                          break;
+                      case CMD_STEP_OFF:
+                          stepper_master_disable(&thrust_motor);
+                          send_ack(recv_addr,port->uart);
+                          break;
+                      case CMD_GET_DEVS:
+                          break;
+                      case CMD_BAD_CMD:
+                          break;
+                      default:
+                          break;
+                  }
+                      break;
+                  case COM_PACKET_ACK:
+                      fifo_push_read_index(&port->uart->rx_fifo, result.bytes_consumed);
+                      com_packet_clear(port->cpacket);
+                      break;
+                  case COM_PACKET_NACK:
+                      fifo_push_read_index(&port->uart->rx_fifo, result.bytes_consumed);
+                      uart_write_packet(port->uart, port->lpacket);
+                      break;
+                  default:
+                      break;
+                }
+        }
+        else if (port->cpacket->dest_addr == COM_ADDR_PEDAL)   {
+            fifo_push_read_index(&port->uart->rx_fifo, result.bytes_consumed);
+            uart_write_packet(uart_cyclic, port->cpacket);
+
+        }
+        else if (port->cpacket->dest_addr == COM_ADDR_CYCLIC)   {
+            fifo_push_read_index(&port->uart->rx_fifo, result.bytes_consumed);
+            uart_write_packet(uart_cyclic, port->cpacket);
+
+        }
+        else if (port->cpacket->dest_addr == COM_ADDR_CTRL)    {
+            fifo_push_read_index(&port->uart->rx_fifo, result.bytes_consumed);
+            uart_write_packet(uart_console, port->cpacket);
+        }
+        memcpy(port->lpacket, port->cpacket, sizeof(com_packet_t));
+    }
+}
+/*
 void update_uart_cyclic(void)   {
 
   uart_update(uart_cyclic);
@@ -581,6 +703,7 @@ void update_uart_cyclic(void)   {
 
   }
 }
+*/
 
 void update_stepper(void)   {
     if(MAG_REL_PRESSED(collective_data.report.buttons))  {
@@ -592,19 +715,26 @@ void update_stepper(void)   {
 }
 
 void send_report(com_addr_t addr)  {
-    com_packet_clear(report_packet);
-    com_packet_create(report_packet, addr, (uint8_t*)&collective_data.raw, sizeof(collective_data.raw));
-    uart_write_packet(uart_cyclic, report_packet);
+    if(addr == COM_ADDR_CYCLIC)	{
+    	com_packet_clear(report_packet);
+    	com_packet_create(report_packet, addr, (uint8_t*)&collective_data.raw, sizeof(collective_data.raw));
+    	uart_write_packet(uart_cyclic, report_packet);
+    }
+    else if(addr == COM_ADDR_CTRL)	{
+    	com_packet_clear(report_packet);
+    	com_packet_create(report_packet, COM_ADDR_CTRL, (uint8_t*)&collective_data.raw, sizeof(collective_data.raw));
+    	uart_write_packet(uart_console, report_packet);
+    }
 }
 
-void send_ack(com_addr_t addr)  {
+void send_ack(com_addr_t addr, uart_handle_t* uart)  {
       com_packet_create_special(special_packet, addr, COM_PACKET_ACK,0,0);
-      uart_write_packet(uart_cyclic, special_packet);
+      uart_write_packet(uart, special_packet);
 }
 
-void send_nack(com_addr_t addr)  {
+void send_nack(com_addr_t addr, uart_handle_t* uart)  {
       com_packet_create_special(special_packet, addr, COM_PACKET_NACK,0,0);
-      uart_write_packet(uart_cyclic, special_packet);
+      uart_write_packet(uart, special_packet);
 }
 
 void calibration_routine(void)	{
@@ -748,12 +878,13 @@ int _write(int fd, char *ptr, int len) {
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-	/* User can add his own implementation to report the HAL error return state */
-	__disable_irq();
-	while (1) {
-	}
-}
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
 #endif
+  /* USER CODE END Error_Handler_Debug */
 
 #ifdef USE_FULL_ASSERT
 /**

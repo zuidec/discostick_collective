@@ -1,5 +1,7 @@
 .settings
+.claude
 .cache
+*.test
 *.d
 *.o
 *.cyclo
@@ -12,3 +14,4 @@
 *.list
 compile_commands.json
 Debug
+build/*
